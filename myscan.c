@@ -150,7 +150,7 @@ DWORD WINAPI threadscan(LPVOID lpParam)
         printf("%-16s %d Open\n", ipback(pa->ip), pa->port);
     }
     closesocket(c);
-    WSACleanup();
+    //WSACleanup();
     return 0;
 }
 int main(int argc, char **argv)
@@ -163,5 +163,6 @@ int main(int argc, char **argv)
     SocketInit();
     scan(getip(argv[1]), getip(argv[2]), atoi(argv[3]));
     //printf("%u %d %d", getip(argv[1]), getip(argv[2]), atoi(argv[3]));
+    WSACleanup();
     return 0;
 }
