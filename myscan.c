@@ -16,13 +16,14 @@ void usage();
 void SocketInit();
 unsigned int getip(char *);
 char *ipback(unsigned int);
-void scan(unsigned int, unsigned int, int);
+void scan(unsigned int, unsigned int, int, int);
 DWORD WINAPI threadscan(LPVOID);
 void usage()
 {
     printf("Usage:\n"
-           "program StartIp EndIp Port\n"
-           "Example:myscan 192.168.1.1 192.168.1.254 80\n");
+           "program StartIp EndIp Port [Thread](Default 10)\n"
+           "Example:myscan 192.168.1.1 192.168.1.254 80\n"
+           "        myscan 192.168.1.1 192.168.1.254 80 256\n");
 }
 void SocketInit()
 {
@@ -84,7 +85,7 @@ unsigned int getip(char *ip)
     }
     return ip_add;
 }
-void scan(unsigned int StartIp, unsigned int EndIp, int port)
+void scan(unsigned int StartIp, unsigned int EndIp, int Port, int Thread)
 {
     if (StartIp > EndIp)
     {
@@ -93,12 +94,12 @@ void scan(unsigned int StartIp, unsigned int EndIp, int port)
     }
     for (unsigned int i = StartIp; i <= EndIp;)
     {
-        DWORD dwThreadId[MAX_THREADS];
-        HANDLE hThread[MAX_THREADS];
+        DWORD dwThreadId[Thread];
+        HANDLE hThread[Thread];
         unsigned int last = EndIp - i;
-        if (last >= MAX_THREADS)
+        if (last >= Thread)
         {
-            last = MAX_THREADS;
+            last = Thread;
         }
         else if (last == 0)
             last = 1;
@@ -107,7 +108,7 @@ void scan(unsigned int StartIp, unsigned int EndIp, int port)
         {
             pData[j] = (struct ScanData *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(struct ScanData *));
             pData[j]->ip = i;
-            pData[j]->port = port;
+            pData[j]->port = Port;
             i++;
             hThread[j] = CreateThread(NULL,
                                       0,
@@ -134,10 +135,10 @@ DWORD WINAPI threadscan(LPVOID lpParam)
     struct ScanData *pa = (struct ScanData *)lpParam;
     char ip[20] = "";
     sprintf(ip, "%u", pa->ip);
-    
+
     SOCKET c;
     SOCKADDR_IN saddr;
-    
+
     /*2.创建客户端socket*/
     c = socket(AF_INET, SOCK_STREAM, 0);
     /*3.定义要连接的服务端信息*/
@@ -155,13 +156,20 @@ DWORD WINAPI threadscan(LPVOID lpParam)
 }
 int main(int argc, char **argv)
 {
-    if (argc!=4)  //ProgramName StartIp EndIp Port
+    
+
+    SocketInit();
+    if (argc == 4) //ProgramName StartIp EndIp Port
+        scan(getip(argv[1]), getip(argv[2]), atoi(argv[3]), MAX_THREADS);
+    else if (argc == 5&&atoi(argv[4])>0) //ProgramName StartIp EndIp Port Thread
+        scan(getip(argv[1]), getip(argv[2]), atoi(argv[3]), atoi(argv[4]));
+    else   
     {
         usage();
         return 1;
     }
-    SocketInit();
-    scan(getip(argv[1]), getip(argv[2]), atoi(argv[3]));
+        
+        
     //printf("%u %d %d", getip(argv[1]), getip(argv[2]), atoi(argv[3]));
     WSACleanup();
     return 0;
