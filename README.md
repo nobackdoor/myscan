@@ -3,4 +3,4 @@
 
 命令行下： myscan StartIp EndIp Port
 
-Example:  myscan 192.168.1.1 192.168.254 80
+Example:  myscan 192.168.1.1 192.168.1.254 80
