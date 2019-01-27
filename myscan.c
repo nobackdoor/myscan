@@ -75,7 +75,7 @@ unsigned int getip(char *ip) //把IP地址转换为10进制无符号整形
             if (ip_int < 0 || ip_int > 255)
             {
 
-                printf("!!!IP ERROR!!!\n");
+                printf("!!!IP ERROR!!!   Not regular IP\n");
                 exit(1);
             }
             ip_add += (ip_int * (unsigned int)(pow(256.0, k)));
