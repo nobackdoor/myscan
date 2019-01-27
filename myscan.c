@@ -4,20 +4,22 @@
 #include <stdlib.h>
 #include <math.h>
 #include <winsock2.h>
-#include <windows.h>
+#include <pthread.h>
+#include <Windows.h>
 #define MAX_THREADS 10
-
 struct ScanData
 {
     unsigned int ip;
     int port;
 };
+const struct ScanData NILDATA;
+pthread_attr_t t_c; //线程属性
 void usage();
-void SocketInit();
+void Init();
 unsigned int getip(char *);
 char *ipback(unsigned int);
-void scan(unsigned int, unsigned int, int, int);
-DWORD WINAPI threadscan(LPVOID);
+void scan(unsigned int, unsigned int, unsigned int, unsigned int);
+void *threadscan(void *);
 void usage()
 {
     printf("Usage:\n"
@@ -25,7 +27,7 @@ void usage()
            "Example:myscan 192.168.1.1 192.168.1.254 80\n"
            "        myscan 192.168.1.1 192.168.1.254 80 256\n");
 }
-void SocketInit()
+void Init()
 {
     WSADATA wd;
     int ret = 0;
@@ -41,8 +43,11 @@ void SocketInit()
         WSACleanup();
         exit(1);
     }
+
+    pthread_attr_init(&t_c);                                    //初始化线程属性
+    pthread_attr_setdetachstate(&t_c, PTHREAD_CREATE_DETACHED); //设置线程属性
 }
-char *ipback(unsigned int ip)
+char *ipback(unsigned int ip) //把10进制无符号整形ip转换为点IP
 {
     char *ipstr = (char *)malloc(17 * sizeof(char));
     unsigned int ip_temp_numbr = 24, ip_int_index[4];
@@ -55,7 +60,7 @@ char *ipback(unsigned int ip)
     sprintf(ipstr, "%d.%d.%d.%d", ip_int_index[0], ip_int_index[1], ip_int_index[2], ip_int_index[3]);
     return ipstr;
 }
-unsigned int getip(char *ip)
+unsigned int getip(char *ip) //把IP地址转换为10进制无符号整形
 {
     char myip[20] = "";
     strcpy(myip, ip);
@@ -69,7 +74,7 @@ unsigned int getip(char *ip)
             unsigned int ip_int = atoi(str_ip_index);
             if (ip_int < 0 || ip_int > 255)
             {
-                //printf("%d\n%s\n", ip_int,str_ip_index);
+
                 printf("!!!IP ERROR!!!\n");
                 exit(1);
             }
@@ -85,54 +90,45 @@ unsigned int getip(char *ip)
     }
     return ip_add;
 }
-void scan(unsigned int StartIp, unsigned int EndIp, int Port, int Thread)
+void scan(unsigned int StartIp, unsigned int EndIp, unsigned int Port, unsigned int Thread)
 {
     if (StartIp > EndIp)
     {
         usage();
+        printf("!!!ERROR!!!  Your StartIp is bigger than your EndIp.\n");
         exit(1);
     }
-    for (unsigned int i = StartIp; i <= EndIp;)
+    for (int i = StartIp; i <= EndIp;)
     {
-        DWORD dwThreadId[Thread];
-        HANDLE hThread[Thread];
-        unsigned int last = EndIp - i;
+        int last = EndIp - i;
         if (last >= Thread)
         {
             last = Thread;
         }
         else if (last == 0)
             last = 1;
-        struct ScanData *pData[last];
-        for (unsigned int j = 0; j < last; j++)
-        {
-            pData[j] = (struct ScanData *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(struct ScanData *));
-            pData[j]->ip = i;
-            pData[j]->port = Port;
-            i++;
-            hThread[j] = CreateThread(NULL,
-                                      0,
-                                      threadscan,
-                                      pData[j],
-                                      0,
-                                      &dwThreadId[j]);
-            if (hThread[j] == NULL)
-            {
-                printf("Create Thread ERROR\n");
-                ExitProcess(j);
-            }
-        }
-        WaitForMultipleObjects(last, hThread, 1, INFINITE);
+        struct ScanData pData[last];
+        for (int k = 0; k < last; k++)
+            pData[k] = NILDATA;
+        pthread_t t[last];
         for (int j = 0; j < last; j++)
         {
-            CloseHandle(hThread[j]);
+            pData[j].ip = i;
+            pData[j].port = Port;
+            i++;
+            if (pthread_create(&t[j], &t_c, threadscan, (void *)&pData[j]) != 0)
+                printf("\nCREATE THREAD ERROR\n");
+            else
+                pthread_join(t[j], NULL);
+            Sleep(10);
         }
+        Sleep(1000);
     }
+    Sleep(3000);
 }
-DWORD WINAPI threadscan(LPVOID lpParam)
+void *threadscan(void *sd)
 {
-    //printf("\nthread start\n");
-    struct ScanData *pa = (struct ScanData *)lpParam;
+    struct ScanData *pa = (struct ScanData *)sd;
     char ip[20] = "";
     sprintf(ip, "%u", pa->ip);
 
@@ -151,26 +147,24 @@ DWORD WINAPI threadscan(LPVOID lpParam)
         printf("%-16s %d Open\n", ipback(pa->ip), pa->port);
     }
     closesocket(c);
-    //WSACleanup();
-    return 0;
+    pthread_exit(NULL);
+    return NULL;
 }
 int main(int argc, char **argv)
 {
-    
 
-    SocketInit();
+    Init();
     if (argc == 4) //ProgramName StartIp EndIp Port
         scan(getip(argv[1]), getip(argv[2]), atoi(argv[3]), MAX_THREADS);
-    else if (argc == 5&&atoi(argv[4])>0) //ProgramName StartIp EndIp Port Thread
+    else if (argc == 5 && atoi(argv[4]) > 0) //ProgramName StartIp EndIp Port Thread
         scan(getip(argv[1]), getip(argv[2]), atoi(argv[3]), atoi(argv[4]));
-    else   
+    else
     {
         usage();
+        WSACleanup();
         return 1;
     }
-        
-        
-    //printf("%u %d %d", getip(argv[1]), getip(argv[2]), atoi(argv[3]));
+
     WSACleanup();
     return 0;
 }
