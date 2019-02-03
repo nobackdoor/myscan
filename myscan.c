@@ -6,26 +6,30 @@
 #include <winsock2.h>
 #include <pthread.h>
 #include <Windows.h>
-#define MAX_THREADS 10
-struct ScanData
+#include <unistd.h>
+#define DEFAULT_THREADS 10              //默认线程数
+unsigned int portlist[65536];           //端口池,portlist[0]为需要测试的端口数
+unsigned int Threads = DEFAULT_THREADS; //线程数
+int debug = 0;
+struct ScanData //分配给线程的数据
 {
     unsigned int ip;
     int port;
 };
-const struct ScanData NILDATA;
-pthread_attr_t t_c; //线程属性
+const struct ScanData NILDATA; //初始化用的空数据
+pthread_attr_t t_c;            //线程属性
 void usage();
 void Init();
 unsigned int getip(char *);
 char *ipback(unsigned int);
-void scan(unsigned int, unsigned int, unsigned int, unsigned int);
+void scan(unsigned int, unsigned int, unsigned int);
 void *threadscan(void *);
 void usage()
 {
     printf("Usage:\n"
-           "program StartIp EndIp Port [Thread](Default 10)\n"
-           "Example:myscan 192.168.1.1 192.168.1.254 80\n"
-           "        myscan 192.168.1.1 192.168.1.254 80 256\n");
+           "program -p Port1[,Port2,Port3...] [-t Thread](default 10) [-d](DEBUG) StartIp EndIp\n"
+           "Example:myscan -p 80 192.168.1.1 192.168.1.254\n"
+           "        myscan -p 21,22,23,80,443,8080 -t 256 192.168.1.1 192.168.1.254\n");
 }
 void Init()
 {
@@ -90,7 +94,7 @@ unsigned int getip(char *ip) //把IP地址转换为10进制无符号整形
     }
     return ip_add;
 }
-void scan(unsigned int StartIp, unsigned int EndIp, unsigned int Port, unsigned int Thread)
+void scan(unsigned int StartIp, unsigned int EndIp, unsigned int Thread)
 {
     if (StartIp > EndIp)
     {
@@ -98,6 +102,7 @@ void scan(unsigned int StartIp, unsigned int EndIp, unsigned int Port, unsigned 
         printf("!!!ERROR!!!  Your StartIp is bigger than your EndIp.\n");
         exit(1);
     }
+    int port_p = 1;
     for (int i = StartIp; i <= EndIp;)
     {
         int last = EndIp - i;
@@ -114,8 +119,13 @@ void scan(unsigned int StartIp, unsigned int EndIp, unsigned int Port, unsigned 
         for (int j = 0; j < last; j++)
         {
             pData[j].ip = i;
-            pData[j].port = Port;
-            i++;
+            pData[j].port = portlist[port_p];
+            port_p++;
+            if (port_p > portlist[0])
+            {
+                port_p = 1;
+                i++;
+            }
             if (pthread_create(&t[j], &t_c, threadscan, (void *)&pData[j]) != 0)
                 printf("\nCREATE THREAD ERROR\n");
             else
@@ -131,7 +141,8 @@ void *threadscan(void *sd)
     struct ScanData *pa = (struct ScanData *)sd;
     char ip[20] = "";
     sprintf(ip, "%u", pa->ip);
-
+    if (debug)
+        printf("Scaning %-16s %d .\n", ipback(pa->ip), pa->port);
     SOCKET c;
     SOCKADDR_IN saddr;
 
@@ -154,17 +165,96 @@ int main(int argc, char **argv)
 {
 
     Init();
-    if (argc == 4) //ProgramName StartIp EndIp Port
-        scan(getip(argv[1]), getip(argv[2]), atoi(argv[3]), MAX_THREADS);
-    else if (argc == 5 && atoi(argv[4]) > 0) //ProgramName StartIp EndIp Port Thread
-        scan(getip(argv[1]), getip(argv[2]), atoi(argv[3]), atoi(argv[4]));
-    else
+    char opt;
+    if (argc < 4) //ProgramName -pPort StartIp EndIp
     {
         usage();
         WSACleanup();
         return 1;
     }
+    while ((opt = getopt(argc, argv, "p:t:d")) != -1)
+    {
+        switch (opt)
+        {
+        case 'p': //port
+        {
+            portlist[0] = 1;
+            char *p = NULL;
+            char *optarg_copy = strdup(optarg);
+            for (p = optarg_copy; *p != '\0'; p++)
+            {
+                if (*p == ',' && *(p + 1) != ',' && *(p + 1) != '\0')
+                    portlist[0]++;
+                else if (*p < '0' || *p > '9')
+                {
+                    printf("!!!PORT ERROR!!!  Check your port set.\n");
+                    free(optarg_copy);
+                    exit(1);
+                }
+            }
 
+            int i = 1;
+            if (portlist[0] != 1)
+            {
+                if ((p = strtok(optarg_copy, ",")) != NULL)
+                {
+                    int temp = atoi(p);
+                    if (temp <= 0 || temp > 65535)
+                    {
+                        printf("!!!PORT ERROR!!!  Check your port set.\n");
+                        free(optarg_copy);
+                        exit(1);
+                    }
+                    portlist[i++] = temp;
+                    while ((p = strtok(NULL, ",")) != NULL)
+                    {
+                        int temp = atoi(p);
+                        if (temp <= 0 || temp > 65535)
+                        {
+                            printf("!!!PORT ERROR!!!  Check your port set.\n");
+                            free(optarg_copy);
+                            exit(1);
+                        }
+                        portlist[i++] = temp;
+                    }
+                }
+            }
+            else
+            {
+                int temp = atoi(optarg_copy);
+                if (temp <= 0 || temp > 65535)
+                {
+                    printf("!!!PORT ERROR!!!  Check your port set.\n");
+                    free(optarg_copy);
+                    exit(1);
+                }
+                portlist[i++] = temp;
+            }
+            free(optarg_copy);
+            break;
+        }
+        case 't': //thread
+        {
+            int temp = atoi(optarg);
+            if (temp <= 0)
+            {
+                printf("!!!THREAD ERROR!!!  Check your thread set.");
+                exit(1);
+            }
+            else
+                Threads = temp;
+            break;
+        }
+        case 'd':
+            debug = 1;
+            break;
+        default:
+            usage();
+            exit(1);
+            break;
+        }
+    }
+    scan(getip(argv[argc - 2]), getip(argv[argc - 1]), Threads);
     WSACleanup();
     return 0;
 }
