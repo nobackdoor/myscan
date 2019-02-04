@@ -11,4 +11,4 @@ myscan -p 21,22,23,80,443,8080 -t 256 192.168.1.1 192.168.1.254
 
 请确保 StartIp 和 EndIp 为最后两项
 
-Please make sure that StartIp&&EndIp are the last options.
+Please make sure that StartIp&EndIp are the last options.
