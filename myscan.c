@@ -102,10 +102,10 @@ void scan(unsigned int StartIp, unsigned int EndIp, unsigned int Thread)
         printf("!!!ERROR!!!  Your StartIp is bigger than your EndIp.\n");
         exit(1);
     }
-    int port_p = 1;
-    for (int i = StartIp; i <= EndIp;)
+    int port_p = 1; //用于循环端口
+    for (int i = StartIp; i <= EndIp;) //i为当前的ip（无符号整型式）
     {
-        int last = EndIp - i;
+        int last = EndIp - i; //last为每组的数量
         if (last >= Thread)
         {
             last = Thread;
@@ -114,7 +114,7 @@ void scan(unsigned int StartIp, unsigned int EndIp, unsigned int Thread)
             last = 1;
         struct ScanData pData[last];
         for (int k = 0; k < last; k++)
-            pData[k] = NILDATA;
+            pData[k] = NILDATA; //初始化扫描数据为空
         pthread_t t[last];
         for (int j = 0; j < last; j++)
         {
@@ -126,7 +126,7 @@ void scan(unsigned int StartIp, unsigned int EndIp, unsigned int Thread)
                 port_p = 1;
                 i++;
             }
-            if (pthread_create(&t[j], &t_c, threadscan, (void *)&pData[j]) != 0)
+            if (pthread_create(&t[j], &t_c, threadscan, (void *)&pData[j]) != 0)//创建线程
                 printf("\nCREATE THREAD ERROR\n");
             else
                 pthread_join(t[j], NULL);
@@ -142,7 +142,7 @@ void *threadscan(void *sd)
     char ip[20] = "";
     sprintf(ip, "%u", pa->ip);
     if (debug)
-        printf("Scaning %-16s %d .\n", ipback(pa->ip), pa->port);
+        printf("Testing %-16s %d ...\n", ipback(pa->ip), pa->port);
     SOCKET c;
     SOCKADDR_IN saddr;
 
@@ -180,12 +180,12 @@ int main(int argc, char **argv)
         {
             portlist[0] = 1;
             char *p = NULL;
-            char *optarg_copy = strdup(optarg);
+            char *optarg_copy = strdup(optarg); //copy
             for (p = optarg_copy; *p != '\0'; p++)
             {
-                if (*p == ',' && *(p + 1) != ',' && *(p + 1) != '\0')
+                if (*p == ',' && *(p + 1) != ',' && *(p + 1) != '\0') //计算输入的端口数
                     portlist[0]++;
-                else if (*p < '0' || *p > '9')
+                else if (*p < '0' || *p > '9') //检查合法
                 {
                     printf("!!!PORT ERROR!!!  Check your port set.\n");
                     free(optarg_copy);
@@ -194,9 +194,9 @@ int main(int argc, char **argv)
             }
 
             int i = 1;
-            if (portlist[0] != 1)
+            if (portlist[0] != 1) //输入的端口不唯一
             {
-                if ((p = strtok(optarg_copy, ",")) != NULL)
+                if ((p = strtok(optarg_copy, ",")) != NULL)  //分割字符串，分离端口
                 {
                     int temp = atoi(p);
                     if (temp <= 0 || temp > 65535)
@@ -206,7 +206,7 @@ int main(int argc, char **argv)
                         exit(1);
                     }
                     portlist[i++] = temp;
-                    while ((p = strtok(NULL, ",")) != NULL)
+                    while ((p = strtok(NULL, ",")) != NULL) //strtok用法：第一次为字符串，后面用NULL
                     {
                         int temp = atoi(p);
                         if (temp <= 0 || temp > 65535)
@@ -245,7 +245,7 @@ int main(int argc, char **argv)
                 Threads = temp;
             break;
         }
-        case 'd':
+        case 'd': //debug
             debug = 1;
             break;
         default:
@@ -254,7 +254,7 @@ int main(int argc, char **argv)
             break;
         }
     }
-    scan(getip(argv[argc - 2]), getip(argv[argc - 1]), Threads);
+    scan(getip(argv[argc - 2]), getip(argv[argc - 1]), Threads); 
     WSACleanup();
     return 0;
 }
