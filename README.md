@@ -1,7 +1,7 @@
 # myscan
 多线程扫描ip段端口程序
 
-命令行下:  myscan -p Port1[,Port2,Port3...] [-t Thread](default 10) [-d](DEBUG) StartIp EndIp
+命令行下:  myscan -p Port1[,Port2,Port3...] [-t Thread](default 10) [-d] (DEBUG) StartIp EndIp
 
 Example:
 
